@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Instagram Story Clone - 24hr Ephemeral Stories</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome for standard UI icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            igPink: '#E1306C',
+            igPurple: '#C13584',
+            igOrange: '#F56040',
+            igYellow: '#FCAF45',
+            darkBg: '#0f0f11',
+            cardDark: '#18181b',
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Instagram Gradient Ring */
+    .ig-ring {
+      background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+    }
+    .ig-ring-viewed {
+      background: #3f3f46;
+    }
+    /* Hide scrollbars for smooth horizontal tray */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    /* Story transition animation */
+    .story-card-pop {
+      animation: popIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.95); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-[#050507] text-gray-100 min-h-screen flex flex-col items-center justify-start p-2 sm:p-4 antialiased selection:bg-pink-500 selection:text-white">
+
+  <!-- Main Container / Phone Mockup Shell -->
+  <div class="w-full max-w-md sm:max-w-lg bg-black border border-zinc-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden relative min-h-[92vh]">
+    
+    <!-- App Header -->
+    <header class="flex items-center justify-between px-4 py-3 border-b border-zinc-800/80 bg-zinc-950/80 backdrop-blur sticky top-0 z-20">
+      <div class="flex items-center space-x-2">
+        <i class="fa-brands fa-instagram text-2xl text-transparent bg-clip-text bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600"></i>
+        <span class="font-bold text-lg tracking-tight">Stories<span class="text-xs ml-1.5 px-2 py-0.5 rounded-full bg-pink-500/20 text-pink-400 font-normal border border-pink-500/30">24h Ephemeral</span></span>
+      </div>
+      <div class="flex items-center gap-2">
+        <button id="toggleDevToolsBtn" title="Dev Time Travel Tools" class="p-2 text-xs font-semibold rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center gap-1.5">
+          <i class="fa-solid fa-clock-rotate-left text-pink-400"></i>
+          <span>Time Travel</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Developer / Simulation Panel (Collapsible) -->
+    <div id="devToolsDrawer" class="hidden bg-zinc-900 border-b border-zinc-800 p-3 text-xs space-y-2">
+      <div class="flex items-center justify-between font-medium text-zinc-400">
+        <span class="flex items-center gap-1.5"><i class="fa-solid fa-flask text-amber-400"></i> 24h Expiration Simulator</span>
+        <button id="closeDevDrawer" class="text-zinc-500 hover:text-zinc-300"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <p class="text-[11px] text-zinc-400">Stories automatically self-destruct after 24 hours. Fast-forward virtual time or test immediate expiration below:</p>
+      <div class="grid grid-cols-2 gap-2 pt-1">
+        <button id="btnAdvance12h" class="bg-zinc-800 hover:bg-zinc-700 px-2 py-1.5 rounded text-zinc-200 border border-zinc-700 transition">
+          +12 Hours Warp
+        </button>
+        <button id="btnAdvance24h" class="bg-zinc-800 hover:bg-zinc-700 px-2 py-1.5 rounded text-zinc-200 border border-zinc-700 transition">
+          +24 Hours Warp (Expire All)
+        </button>
+        <button id="btnAddExpiredMock" class="bg-zinc-800 hover:bg-zinc-700 px-2 py-1.5 rounded text-zinc-200 border border-zinc-700 transition">
+          + Inject 25hr Old Story
+        </button>
+        <button id="btnResetData" class="bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/40 px-2 py-1.5 rounded transition">
+          Reset Storage
+        </button>
+      </div>
+      <div class="text-[10px] text-zinc-500 flex justify-between items-center pt-1 border-t border-zinc-800/60">
+        <span>Simulated Clock Offset: <strong id="simOffsetDisplay" class="text-pink-400">0h</strong></span>
+        <button id="btnResetTimeWarp" class="text-xs text-blue-400 hover:underline">Reset Clock</button>
+      </div>
+    </div>
+
+    <!-- Hidden native file input -->
+    <input type="file" id="storyFileInput" accept="image/*" class="hidden" />
+
+    <!-- Top Horizontal Story Tray -->
+    <section class="py-4 px-2 border-b border-zinc-800/60 bg-black">
+      <div class="flex items-center space-x-3 overflow-x-auto no-scrollbar px-2 py-1" id="storyTrayContainer">
+        
+        <!-- Add Story Circle -->
+        <div class="flex flex-col items-center shrink-0 cursor-pointer group" id="addStoryBtn">
+          <div class="relative w-16 h-16 rounded-full border-2 border-dashed border-zinc-600 flex items-center justify-center p-[2px] transition group-hover:border-pink-500 group-hover:scale-105">
+            <div class="w-full h-full rounded-full bg-zinc-900 flex items-center justify-center overflow-hidden">
+              <i class="fa-solid fa-user text-zinc-500 text-xl group-hover:text-zinc-300"></i>
+            </div>
+            <div class="absolute bottom-0 right-0 w-5 h-5 rounded-full bg-blue-500 border-2 border-black flex items-center justify-center shadow-md">
+              <i class="fa-solid fa-plus text-white text-[10px]"></i>
+            </div>
+          </div>
+          <span class="text-[11px] mt-1.5 text-zinc-300 font-medium tracking-tight">Your story</span>
+        </div>
+
+        <!-- Rendered Story Avatars Container -->
+        <div id="activeStoriesList" class="flex items-center space-x-3 shrink-0"></div>
+
+      </div>
+    </section>
+
+    <!-- Main Feed / Placeholder Feed area -->
+    <main class="flex-1 flex flex-col items-center justify-center p-6 text-center space-y-4">
+      <div class="w-16 h-16 rounded-full bg-zinc-900 flex items-center justify-center border border-zinc-800 text-zinc-500">
+        <i class="fa-regular fa-image text-2xl"></i>
+      </div>
+      <div>
+        <h2 class="text-base font-semibold text-zinc-200">Ephemeral Stories Tray</h2>
+        <p class="text-xs text-zinc-400 max-w-xs mt-1">
+          Tap <strong class="text-zinc-200">"Your story"</strong> or the <strong class="text-zinc-200">+</strong> icon above to post an image. It will be compressed client-side and deleted strictly after 24 hours.
+        </p>
+      </div>
+
+      <div class="w-full bg-zinc-950/80 border border-zinc-800/80 rounded-2xl p-4 text-left space-y-2 mt-4 text-xs">
+        <div class="flex items-center justify-between text-zinc-300 font-semibold border-b border-zinc-800 pb-2">
+          <span>Active Stories Registry</span>
+          <span id="activeCountBadge" class="bg-zinc-800 px-2 py-0.5 rounded text-[11px] text-pink-400">0 Active</span>
+        </div>
+        <ul id="activeStoriesDebugList" class="space-y-1 text-zinc-400 text-[11px] max-h-36 overflow-y-auto">
+          <!-- Populated by JS -->
+        </ul>
+      </div>
+    </main>
+
+    <!-- Storage Quota Footer Status -->
+    <footer class="p-3 bg-zinc-950 border-t border-zinc-900 text-[11px] text-zinc-500 flex justify-between items-center">
+      <span>Auto-purging enabled (< 24h)</span>
+      <span id="storageStats">Storage: ~0 KB</span>
+    </footer>
+
+  </div>
+
+  <!-- UPLOAD MODAL / CAPTION DIALOG -->
+  <div id="uploadPreviewModal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm hidden flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border border-zinc-800 w-full max-w-md rounded-2xl overflow-hidden shadow-2xl flex flex-col">
+      <div class="p-3 border-b border-zinc-800 flex justify-between items-center text-sm font-semibold">
+        <span>Story Preview & Resize</span>
+        <button id="cancelUploadBtn" class="text-zinc-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="p-4 flex flex-col items-center">
+        <div class="relative w-full max-h-[360px] bg-black rounded-lg overflow-hidden flex items-center justify-center">
+          <img id="uploadPreviewImg" src="" alt="Preview" class="max-h-[360px] w-auto object-contain rounded-lg" />
+          <div id="compressingIndicator" class="absolute inset-0 bg-black/70 flex flex-col items-center justify-center space-y-2 text-xs">
+            <i class="fa-solid fa-circle-notch fa-spin text-pink-500 text-2xl"></i>
+            <span>Constraining to 1080x1920...</span>
+          </div>
+        </div>
+        <div class="w-full mt-3 space-y-2">
+          <input type="text" id="storyCaptionInput" placeholder="Add a caption..." maxlength="80" 
+                 class="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-pink-500" />
+          <div class="flex items-center justify-between text-[11px] text-zinc-400">
+            <span id="fileSizeInfo">Calculated Size: --</span>
+            <span class="text-amber-400 font-mono">Expires in 24 hours</span>
+          </div>
+        </div>
+      </div>
+      <div class="p-3 bg-zinc-950 border-t border-zinc-800 flex justify-end gap-2">
+        <button id="discardUploadBtn" class="px-4 py-2 text-xs text-zinc-400 hover:text-white rounded-xl">Discard</button>
+        <button id="publishStoryBtn" class="px-5 py-2 text-xs font-semibold bg-gradient-to-r from-pink-500 to-purple-600 hover:opacity-90 text-white rounded-xl shadow-lg transition">Share Story</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FULLSCREEN STORY VIEWER MODAL -->
+  <div id="storyViewerModal" class="fixed inset-0 z-50 bg-black hidden flex items-center justify-center select-none overflow-hidden touch-none">
+    
+    <!-- Desktop Close button outside phone wrapper -->
+    <button id="viewerCloseDesktop" class="absolute top-4 right-5 text-white/70 hover:text-white text-3xl hidden md:block z-50 transition cursor-pointer">
+      <i class="fa-solid fa-xmark"></i>
+    </button>
+
+    <!-- Story Player Container -->
+    <div id="storyViewerBox" class="relative w-full h-full sm:max-w-md sm:h-[95vh] sm:rounded-2xl overflow-hidden bg-black flex flex-col justify-between shadow-2xl">
+      
+      <!-- Top Story Header & Segmented Progress Bars -->
+      <div class="absolute top-0 left-0 right-0 z-30 p-3 pt-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent space-y-2">
+        
+        <!-- Segmented Bars Container -->
+        <div id="progressBarsTrack" class="flex gap-1.5 w-full">
+          <!-- Dynamically populated bars -->
+        </div>
+
+        <!-- User Info Bar -->
+        <div class="flex items-center justify-between mt-1 text-white">
+          <div class="flex items-center space-x-2.5">
+            <div class="w-8 h-8 rounded-full border border-white/40 overflow-hidden bg-zinc-800">
+              <img id="viewerAvatar" src="" alt="Avatar" class="w-full h-full object-cover" />
+            </div>
+            <div>
+              <p id="viewerUsername" class="text-xs font-bold tracking-wide drop-shadow"></p>
+              <p id="viewerTimestamp" class="text-[10px] text-white/80 drop-shadow flex items-center gap-1"></p>
+            </div>
+          </div>
+
+          <div class="flex items-center space-x-2">
+            <!-- Delete Story Option -->
+            <button id="btnDeleteCurrentStory" title="Delete this story" class="p-2 text-white/80 hover:text-red-400 transition cursor-pointer">
+              <i class="fa-solid fa-trash-can text-sm drop-shadow"></i>
+            </button>
+            <!-- Mobile Close -->
+            <button id="viewerCloseMobile" class="p-2 text-white/80 hover:text-white md:hidden text-lg cursor-pointer">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Story Media Content Center -->
+      <div class="relative w-full h-full flex items-center justify-center overflow-hidden bg-zinc-950">
+        <img id="activeStoryImage" src="" alt="Story Media" class="w-full h-full object-contain pointer-events-none transition-transform duration-150" />
+        
+        <!-- Optional Caption Display -->
+        <div id="viewerCaptionContainer" class="absolute bottom-16 left-0 right-0 px-4 text-center z-20 hidden">
+          <span id="viewerCaptionText" class="inline-block px-3 py-1.5 bg-black/60 backdrop-blur-md text-white text-xs rounded-xl shadow-lg border border-white/10 max-w-xs break-words">
+          </span>
+        </div>
+      </div>
+
+      <!-- Tap Target Overlays (Prev / Pause / Next) -->
+      <!-- Left Tap: Previous -->
+      <div id="tapLeftZone" class="absolute top-20 bottom-16 left-0 w-1/3 z-20 cursor-pointer"></div>
+      <!-- Right Tap: Next -->
+      <div id="tapRightZone" class="absolute top-20 bottom-16 right-0 w-2/3 z-20 cursor-pointer"></div>
+
+      <!-- Pause indicator icon (shown when holding down) -->
+      <div id="pauseIndicator" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 text-white/80 text-4xl hidden pointer-events-none">
+        <i class="fa-solid fa-pause"></i>
+      </div>
+
+      <!-- Quick Reply & Navigation Footer -->
+      <div class="relative z-30 p-3 flex items-center justify-between text-xs text-white/70 bg-gradient-to-t from-black/80 to-transparent">
+        <div class="flex items-center space-x-2 w-full pr-4">
+          <div class="flex-1 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 text-zinc-300 text-[11px] flex items-center">
+            <span>Send message...</span>
+          </div>
+          <button class="text-white hover:text-pink-400 text-lg transition"><i class="fa-regular fa-heart"></i></button>
+          <button class="text-white hover:text-blue-400 text-lg transition"><i class="fa-regular fa-paper-plane"></i></button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- APPLICATION LOGIC -->
+  <script>
+    /**
+     * Instagram Stories 24-Hour Client-Side Ephemeral Storage
+     */
+    const STORAGE_KEY = 'ig_ephemeral_stories_v1';
+    const STORY_DURATION_MS = 5000; // 5 seconds per story
+    const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000;
+
+    // Time-travel simulator offset in ms (for testing 24-hr expiration)
+    let simulatedTimeOffset = 0;
+
+    function getNow() {
+      return Date.now() + simulatedTimeOffset;
+    }
+
+    // Default mock stories if storage is empty
+    const DEFAULT_MOCKS = [
+      {
+        id: 'mock-1',
+        username: 'traveler_mike',
+        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+        dataUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1080&auto=format&fit=crop&q=80',
+        timestamp: Date.now() - (2 * 60 * 60 * 1000), // 2 hours ago
+        caption: 'Sunset vibes at the beach! 🌊'
+      },
+      {
+        id: 'mock-2',
+        username: 'sarah_design',
+        avatarUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&auto=format&fit=crop&q=80',
+        dataUrl: 'https://images.unsplash.com/photo-1513542789411-b6a5d4f31634?w=1080&auto=format&fit=crop&q=80',
+        timestamp: Date.now() - (18 * 60 * 60 * 1000), // 18 hours ago
+        caption: 'Late night sketching session ✏️'
+      },
+      {
+        id: 'mock-3',
+        username: 'foodie_alex',
+        avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&auto=format&fit=crop&q=80',
+        dataUrl: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=1080&auto=format&fit=crop&q=80',
+        timestamp: Date.now() - (23 * 60 * 60 * 1000), // 23 hours ago (expires in 1 hr)
+        caption: 'Best pizza in town! 🍕'
+      }
+    ];
+
+    // State Variables
+    let stories = [];
+    let currentStoryIndex = 0;
+    let storyTimer = null;
+    let progressStartTime = 0;
+    let remainingTime = STORY_DURATION_MS;
+    let isPaused = false;
+    let preparedBase64 = null;
+
+    // Touch Swipe Navigation Coordinates
+    let touchStartX = 0;
+    let touchStartY = 0;
+
+    // DOM Elements
+    const storyFileInput = document.getElementById('storyFileInput');
+    const addStoryBtn = document.getElementById('addStoryBtn');
+    const activeStoriesList = document.getElementById('activeStoriesList');
+    const activeStoriesDebugList = document.getElementById('activeStoriesDebugList');
+    const activeCountBadge = document.getElementById('activeCountBadge');
+    const storageStats = document.getElementById('storageStats');
+
+    // Upload Modal Elements
+    const uploadPreviewModal = document.getElementById('uploadPreviewModal');
+    const uploadPreviewImg = document.getElementById('uploadPreviewImg');
+    const storyCaptionInput = document.getElementById('storyCaptionInput');
+    const fileSizeInfo = document.getElementById('fileSizeInfo');
+    const compressingIndicator = document.getElementById('compressingIndicator');
+    const publishStoryBtn = document.getElementById('publishStoryBtn');
+    const cancelUploadBtn = document.getElementById('cancelUploadBtn');
+    const discardUploadBtn = document.getElementById('discardUploadBtn');
+
+    // Viewer Elements
+    const storyViewerModal = document.getElementById('storyViewerModal');
+    const progressBarsTrack = document.getElementById('progressBarsTrack');
+    const viewerAvatar = document.getElementById('viewerAvatar');
+    const viewerUsername = document.getElementById('viewerUsername');
+    const viewerTimestamp = document.getElementById('viewerTimestamp');
+    const activeStoryImage = document.getElementById('activeStoryImage');
+    const viewerCaptionContainer = document.getElementById('viewerCaptionContainer');
+    const viewerCaptionText = document.getElementById('viewerCaptionText');
+    const tapLeftZone = document.getElementById('tapLeftZone');
+    const tapRightZone = document.getElementById('tapRightZone');
+    const pauseIndicator = document.getElementById('pauseIndicator');
+    const viewerCloseDesktop = document.getElementById('viewerCloseDesktop');
+    const viewerCloseMobile = document.getElementById('viewerCloseMobile');
+    const btnDeleteCurrentStory = document.getElementById('btnDeleteCurrentStory');
+
+    // Dev drawer elements
+    const toggleDevToolsBtn = document.getElementById('toggleDevToolsBtn');
+    const devToolsDrawer = document.getElementById('devToolsDrawer');
+    const closeDevDrawer = document.getElementById('closeDevDrawer');
+    const btnAdvance12h = document.getElementById('btnAdvance12h');
+    const btnAdvance24h = document.getElementById('btnAdvance24h');
+    const btnAddExpiredMock = document.getElementById('btnAddExpiredMock');
+    const btnResetData = document.getElementById('btnResetData');
+    const btnResetTimeWarp = document.getElementById('btnResetTimeWarp');
+    const simOffsetDisplay = document.getElementById('simOffsetDisplay');
+
+    /**
+     * Storage Helpers with 24-Hour Expiration Filtering
+     */
+    function loadStories() {
+      const stored = localStorage.getItem(STORAGE_KEY);
+      if (!stored) {
+        stories = [...DEFAULT_MOCKS];
+        saveStories();
+      } else {
+        try {
+          stories = JSON.parse(stored);
+        } catch (e) {
+          console.error('Failed to parse stories:', e);
+          stories = [];
+        }
+      }
+      purgeExpiredStories();
+    }
+
+    function saveStories() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stories));
+      updateStorageInfo();
+    }
+
+    /**
+     * Filter out stories where timestamp + 24hr < current time
+     */
+    function purgeExpiredStories() {
+      const currentTime = getNow();
+      const initialCount = stories.length;
+      
+      stories = stories.filter(story => {
+        const age = currentTime - story.timestamp;
+        return age < TWENTY_FOUR_HOURS_MS && age >= 0;
+      });
+
+      if (stories.length !== initialCount) {
+        saveStories();
+      }
+      renderTray();
+      renderDebugList();
+    }
+
+    /**
+     * Human-readable relative time and expiration countdown
+     */
+    function formatTimeRemaining(timestamp) {
+      const currentTime = getNow();
+      const elapsed = currentTime - timestamp;
+      const leftMs = TWENTY_FOUR_HOURS_MS - elapsed;
+
+      if (leftMs <= 0) return 'Expired';
+
+      const hoursLeft = Math.floor(leftMs / (1000 * 60 * 60));
+      const minutesLeft = Math.floor((leftMs % (1000 * 60 * 60)) / (1000 * 60));
+
+      const elapsedHours = Math.floor(elapsed / (1000 * 60 * 60));
+      const elapsedMinutes = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+
+      let postedStr = elapsedHours > 0 ? `${elapsedHours}h ago` : `${Math.max(1, elapsedMinutes)}m ago`;
+      let countdownStr = hoursLeft > 0 ? `${hoursLeft}h left` : `${minutesLeft}m left`;
+
+      return { postedStr, countdownStr };
+    }
+
+    /**
+     * Render the Top Horizontal Story Tray
+     */
+    function renderTray() {
+      activeStoriesList.innerHTML = '';
+
+      stories.forEach((story, index) => {
+        const timeInfo = formatTimeRemaining(story.timestamp);
+
+        const storyItem = document.createElement('div');
+        storyItem.className = 'flex flex-col items-center shrink-0 cursor-pointer group story-card-pop';
+        storyItem.onclick = () => openStoryViewer(index);
+
+        storyItem.innerHTML = `
+          <div class="p-[2.5px] rounded-full ig-ring transition-transform transform group-hover:scale-105">
+            <div class="p-[2px] bg-black rounded-full">
+              <img src="${story.avatarUrl || story.dataUrl}" alt="${story.username}" 
+                   class="w-14 h-14 rounded-full object-cover border border-zinc-900 bg-zinc-800" 
+                   onerror="this.src='https://placehold.co/100x100/222/fff?text=User'" />
+            </div>
+          </div>
+          <span class="text-[11px] mt-1 text-zinc-300 font-medium truncate max-w-[65px] text-center">${story.username}</span>
+          <span class="text-[9px] text-zinc-500">${timeInfo.postedStr}</span>
+        `;
+
+        activeStoriesList.appendChild(storyItem);
+      });
+
+      activeCountBadge.innerText = `${stories.length} Active`;
+    }
+
+    /**
+     * Render Active Stories Debug Information
+     */
+    function renderDebugList() {
+      activeStoriesDebugList.innerHTML = '';
+      if (stories.length === 0) {
+        activeStoriesDebugList.innerHTML = `<li class="text-zinc-600 italic">No active stories within the 24h window.</li>`;
+        return;
+      }
+
+      stories.forEach((s) => {
+        const { postedStr, countdownStr } = formatTimeRemaining(s.timestamp);
+        const li = document.createElement('li');
+        li.className = 'flex items-center justify-between py-1 border-b border-zinc-900';
+        li.innerHTML = `
+          <div class="flex items-center space-x-2">
+            <span class="text-pink-400 font-medium">@${s.username}</span>
+            <span class="text-zinc-500">(${postedStr})</span>
+          </div>
+          <span class="font-mono text-emerald-400 text-[10px] bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/30">
+            ${countdownStr}
+          </span>
+        `;
+        activeStoriesDebugList.appendChild(li);
+      });
+    }
+
+    /**
+     * Calculate and display localStorage footprint
+     */
+    function updateStorageInfo() {
+      const data = localStorage.getItem(STORAGE_KEY) || '';
+      const bytes = new Blob([data]).size;
+      const kb = (bytes / 1024).toFixed(1);
+      storageStats.innerText = `Storage: ${kb} KB`;
+    }
+
+    /**
+     * Image Upload and Canvas Compression to <= 1080px x 1920px
+     */
+    addStoryBtn.addEventListener('click', () => {
+      storyFileInput.click();
+    });
+
+    storyFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      compressingIndicator.classList.remove('hidden');
+      uploadPreviewModal.classList.remove('hidden');
+
+      reader.onload = function(event) {
+        const img = new Image();
+        img.onload = function() {
+          // Constrain within 1080 x 1920 maintaining aspect ratio
+          const MAX_WIDTH = 1080;
+          const MAX_HEIGHT = 1920;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+            const widthRatio = MAX_WIDTH / width;
+            const heightRatio = MAX_HEIGHT / height;
+            const bestRatio = Math.min(widthRatio, heightRatio);
+
+            width = Math.round(width * bestRatio);
+            height = Math.round(height * bestRatio);
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Convert to compressed JPEG dataURL
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.82);
+          preparedBase64 = compressedDataUrl;
+
+          // Display in preview dialog
+          uploadPreviewImg.src = compressedDataUrl;
+          compressingIndicator.classList.add('hidden');
+
+          const approxKb = (new Blob([compressedDataUrl]).size / 1024).toFixed(0);
+          fileSizeInfo.innerText = `Resized: ${width}x${height}px (~${approxKb} KB)`;
+        };
+        img.src = event.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Publish New Story
+    publishStoryBtn.addEventListener('click', () => {
+      if (!preparedBase64) return;
+
+      const newStory = {
+        id: 'story-' + Date.now(),
+        username: 'you',
+        avatarUrl: preparedBase64,
+        dataUrl: preparedBase64,
+        timestamp: getNow(),
+        caption: storyCaptionInput.value.trim()
+      };
+
+      // Add to front of list
+      stories.unshift(newStory);
+      saveStories();
+      renderTray();
+      renderDebugList();
+
+      // Close modal & reset
+      closeUploadModal();
+      openStoryViewer(0);
+    });
+
+    function closeUploadModal() {
+      uploadPreviewModal.classList.add('hidden');
+      storyFileInput.value = '';
+      storyCaptionInput.value = '';
+      preparedBase64 = null;
+    }
+
+    cancelUploadBtn.onclick = closeUploadModal;
+    discardUploadBtn.onclick = closeUploadModal;
+
+    /**
+     * FULLSCREEN STORY VIEWER CONTROLLER
+     */
+    function openStoryViewer(index) {
+      if (stories.length === 0) return;
+      currentStoryIndex = Math.max(0, Math.min(index, stories.length - 1));
+      storyViewerModal.classList.remove('hidden');
+      setupProgressBars();
+      displayStory(currentStoryIndex);
+    }
+
+    function closeStoryViewer() {
+      storyViewerModal.classList.add('hidden');
+      clearTimeout(storyTimer);
+      storyTimer = null;
+    }
+
+    viewerCloseDesktop.onclick = closeStoryViewer;
+    viewerCloseMobile.onclick = closeStoryViewer;
+
+    // Segmented Progress Bar Setup
+    function setupProgressBars() {
+      progressBarsTrack.innerHTML = '';
+      stories.forEach((_, i) => {
+        const barWrapper = document.createElement('div');
+        barWrapper.className = 'h-1 flex-1 bg-white/30 rounded-full overflow-hidden';
+        
+        const innerFill = document.createElement('div');
+        innerFill.id = `story-progress-${i}`;
+        innerFill.className = 'h-full bg-white transition-none w-0';
+        barWrapper.appendChild(innerFill);
+        progressBarsTrack.appendChild(barWrapper);
+      });
+    }
+
+    function displayStory(index) {
+      clearTimeout(storyTimer);
+      if (index >= stories.length) {
+        closeStoryViewer();
+        return;
+      }
+      if (index < 0) {
+        currentStoryIndex = 0;
+        return;
+      }
+
+      currentStoryIndex = index;
+      const story = stories[index];
+
+      // Update Header info
+      viewerUsername.innerText = story.username;
+      viewerAvatar.src = story.avatarUrl || story.dataUrl;
+      const { postedStr, countdownStr } = formatTimeRemaining(story.timestamp);
+      viewerTimestamp.innerHTML = `${postedStr} &bull; <span class="text-amber-300 font-medium">${countdownStr}</span>`;
+
+      // Update Image
+      activeStoryImage.src = story.dataUrl;
+
+      // Update Caption
+      if (story.caption && story.caption.trim().length > 0) {
+        viewerCaptionText.innerText = story.caption;
+        viewerCaptionContainer.classList.remove('hidden');
+      } else {
+        viewerCaptionContainer.classList.add('hidden');
+      }
+
+      // Synchronize Segmented Progress Bars
+      stories.forEach((_, i) => {
+        const fill = document.getElementById(`story-progress-${i}`);
+        if (!fill) return;
+        fill.style.transition = 'none';
+        if (i < currentStoryIndex) {
+          fill.style.width = '100%';
+        } else if (i > currentStoryIndex) {
+          fill.style.width = '0%';
+        } else {
+          fill.style.width = '0%';
+        }
+      });
+
+      // Start timer animation for current story
+      startStoryTimer(STORY_DURATION_MS);
+    }
+
+    function startStoryTimer(duration) {
+      clearTimeout(storyTimer);
+      remainingTime = duration;
+      progressStartTime = Date.now();
+      isPaused = false;
+      pauseIndicator.classList.add('hidden');
+
+      const fill = document.getElementById(`story-progress-${currentStoryIndex}`);
+      if (fill) {
+        // Trigger CSS width transition
+        setTimeout(() => {
+          fill.style.transition = `width ${duration}ms linear`;
+          fill.style.width = '100%';
+        }, 30);
+      }
+
+      storyTimer = setTimeout(() => {
+        nextStory();
+      }, duration);
+    }
+
+    function pauseStory() {
+      if (isPaused) return;
+      isPaused = true;
+      clearTimeout(storyTimer);
+      const elapsed = Date.now() - progressStartTime;
+      remainingTime = Math.max(0, remainingTime - elapsed);
+
+      // Freeze progress bar at current rendered percentage
+      const fill = document.getElementById(`story-progress-${currentStoryIndex}`);
+      if (fill) {
+        const computedWidth = window.getComputedStyle(fill).width;
+        fill.style.transition = 'none';
+        fill.style.width = computedWidth;
+      }
+      pauseIndicator.classList.remove('hidden');
+    }
+
+    function resumeStory() {
+      if (!isPaused) return;
+      isPaused = false;
+      pauseIndicator.classList.add('hidden');
+      startStoryTimer(remainingTime);
+    }
+
+    function nextStory() {
+      if (currentStoryIndex < stories.length - 1) {
+        displayStory(currentStoryIndex + 1);
+      } else {
+        closeStoryViewer();
+      }
+    }
+
+    function prevStory() {
+      if (currentStoryIndex > 0) {
+        displayStory(currentStoryIndex - 1);
+      } else {
+        // Restart first story
+        displayStory(0);
+      }
+    }
+
+    // Tap Navigation (Left: previous, Right: next)
+    tapLeftZone.addEventListener('click', (e) => {
+      e.stopPropagation();
+      prevStory();
+    });
+
+    tapRightZone.addEventListener('click', (e) => {
+      e.stopPropagation();
+      nextStory();
+    });
+
+    // Hold-to-pause logic for Mouse & Touch
+    const viewerBox = document.getElementById('storyViewerBox');
+
+    viewerBox.addEventListener('mousedown', (e) => {
+      if (e.target.closest('button')) return;
+      pauseStory();
+    });
+    viewerBox.addEventListener('mouseup', () => {
+      if (isPaused) resumeStory();
+    });
+
+    viewerBox.addEventListener('touchstart', (e) => {
+      if (e.target.closest('button')) return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      pauseStory();
+    }, { passive: true });
+
+    viewerBox.addEventListener('touchend', (e) => {
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+
+      if (isPaused) resumeStory();
+
+      // Swipe Gestures Detection (Threshold 50px)
+      if (Math.abs(deltaX) > 50 && Math.abs(deltaX) > Math.abs(deltaY)) {
+        if (deltaX < 0) {
+          // Swiped Left -> Next story
+          nextStory();
+        } else {
+          // Swiped Right -> Prev story
+          prevStory();
+        }
+      } else if (deltaY > 70) {
+        // Swiped down -> Close modal
+        closeStoryViewer();
+      }
+    }, { passive: true });
+
+    // Keyboard navigation (Arrow keys + Esc)
+    window.addEventListener('keydown', (e) => {
+      if (storyViewerModal.classList.contains('hidden')) return;
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        nextStory();
+      } else if (e.key === 'ArrowLeft') {
+        prevStory();
+      } else if (e.key === 'Escape') {
+        closeStoryViewer();
+      }
+    });
+
+    // Delete Active Story Button
+    btnDeleteCurrentStory.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (stories.length === 0) return;
+      stories.splice(currentStoryIndex, 1);
+      saveStories();
+      renderTray();
+      renderDebugList();
+
+      if (stories.length === 0) {
+        closeStoryViewer();
+      } else {
+        setupProgressBars();
+        if (currentStoryIndex >= stories.length) {
+          currentStoryIndex = stories.length - 1;
+        }
+        displayStory(currentStoryIndex);
+      }
+    });
+
+    /**
+     * TIME TRAVEL / DEV TESTING CONTROLS
+     */
+    toggleDevToolsBtn.onclick = () => devToolsDrawer.classList.toggle('hidden');
+    closeDevDrawer.onclick = () => devToolsDrawer.classList.add('hidden');
+
+    function updateWarpUI() {
+      const hours = (simulatedTimeOffset / (1000 * 60 * 60)).toFixed(1);
+      simOffsetDisplay.innerText = `+${hours}h`;
+      purgeExpiredStories();
+    }
+
+    btnAdvance12h.onclick = () => {
+      simulatedTimeOffset += 12 * 60 * 60 * 1000;
+      updateWarpUI();
+    };
+
+    btnAdvance24h.onclick = () => {
+      simulatedTimeOffset += 24 * 60 * 60 * 1000;
+      updateWarpUI();
+      if (!storyViewerModal.classList.contains('hidden')) {
+        closeStoryViewer();
+      }
+    };
+
+    btnAddExpiredMock.onclick = () => {
+      const expiredStory = {
+        id: 'expired-' + Date.now(),
+        username: 'ghost_post',
+        avatarUrl: 'https://placehold.co/150x150/444/fff?text=Ghost',
+        dataUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1080&auto=format&fit=crop&q=80',
+        timestamp: getNow() - (25 * 60 * 60 * 1000), // 25 hours old
+        caption: 'This should vanish immediately upon expiration check.'
+      };
+      stories.push(expiredStory);
+      saveStories();
+      purgeExpiredStories();
+    };
+
+    btnResetData.onclick = () => {
+      localStorage.removeItem(STORAGE_KEY);
+      simulatedTimeOffset = 0;
+      loadStories();
+      updateWarpUI();
+    };
+
+    btnResetTimeWarp.onclick = () => {
+      simulatedTimeOffset = 0;
+      updateWarpUI();
+    };
+
+    // Auto-check expiration every 10 seconds
+    setInterval(() => {
+      purgeExpiredStories();
+      if (!storyViewerModal.classList.contains('hidden') && stories[currentStoryIndex]) {
+        const { postedStr, countdownStr } = formatTimeRemaining(stories[currentStoryIndex].timestamp);
+        viewerTimestamp.innerHTML = `${postedStr} &bull; <span class="text-amber-300 font-medium">${countdownStr}</span>`;
+      }
+    }, 10000);
+
+    // Initial load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadStories();
+    });
+  </script>
+</body>
+</html>
